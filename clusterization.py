@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from math import inf
 import statistics
@@ -70,7 +71,13 @@ class Clusterer(ABC):
         distances = dict(map(lambda c: (c, {}), clusters))
         min_dist = (inf, (None, None))
 
-        def merge(a: Cluster, b: Cluster):
+        def merge(a: Cluster, b: Cluster) -> tuple:
+            """
+            Merge 2 clusters
+            :param a: 1-st cluster
+            :param b: 2-nd cluster
+            :return: new min_distance, containing minimal distance value and pair of clusters for this distance
+            """
             merged = self.cluster_class((a, b))
             clusters.remove(a)
             clusters.remove(b)
@@ -79,29 +86,49 @@ class Clusterer(ABC):
             if b in distances:
                 del distances[b]
             distances[merged] = {}
+            global_min = (inf, (None, None))
             for cluster in clusters:
+                # Is row minimum needs to be recalculated
+                recalc_min = False
                 if a in distances[cluster]:
                     del distances[cluster][a]
+                    if a in distances[cluster]['min'][1]:
+                        recalc_min = True
                 if b in distances[cluster]:
                     del distances[cluster][b]
-                distances[cluster][merged] = self.calc_distance(cluster, merged)
+                    if b in distances[cluster]['min'][1]:
+                        recalc_min = True
+                d = self.calc_distance(cluster, merged)
+                if recalc_min:
+                    local_min = (inf, (None, None))
+                    for key in distances[cluster]:
+                        if key == 'min':
+                            continue
+                        if distances[cluster][key] < d:
+                            local_min = (dist, (cluster, key))
+                    distances[cluster]['min'] = local_min
+                distances[cluster][merged] = d
+                distances[merged] = {'min': (inf, (None, None))}
+                if d < distances[cluster]['min'][0]:
+                    distances[cluster]['min'] = (d, (cluster, merged))
+                if distances[cluster]['min'][0] < global_min[0]:
+                    global_min = distances[cluster]['min']
             clusters.append(merged)
+            return global_min
 
         # calculate each - to each distance
         for i in range(0, len(clusters)):
+            local_min = (inf, (None, None))
             for j in range(i+1, len(clusters)):
                 dist = self.calc_distance(clusters[i], clusters[j])
                 distances[clusters[i]][clusters[j]] = dist
                 if dist < min_dist[0]:
                     min_dist = (dist, (clusters[i], clusters[j]))
+                if dist < local_min[0]:
+                    local_min = (dist, (clusters[i], clusters[j]))
+            distances[clusters[i]]['min'] = local_min
         # repeat merging closest clusters
         while len(clusters) > 1:
-            merge(*min_dist[1])
-            min_dist = (inf, (None, None))
-            for i in range(0, len(clusters)):
-                for j in range(i + 1, len(clusters)):
-                    dist = distances[clusters[i]][clusters[j]]
-                    if dist < min_dist[0]:
-                        min_dist = (dist, (clusters[i], clusters[j]))
+            min_dist = merge(*min_dist[1])
 
         return clusters[0]
