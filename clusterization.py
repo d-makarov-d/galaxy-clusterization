@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import math
 from abc import ABC, abstractmethod
 from math import inf
-import statistics
 from functools import reduce
 from collections.abc import Iterable
+from typing import Callable, Tuple
+
+import numpy as np
+from numpy.typing import NDArray
 
 from db.galaxy import Galaxy
 
@@ -17,11 +19,19 @@ class Cluster(Galaxy, ABC):
         :param members: Galaxies or clusters, contained by this object
         """
         self._members = members
-        self._z = self.merge_z(map(lambda el: el.z, self.members))
-        self._alpha = self.merge_alpha(map(lambda el: el.alpha, self.members))
-        self._delta = self.merge_delta(map(lambda el: el.delta, self.members))
-        self._lum = self.merge_lum(map(lambda el: el.lum, self.members))
-        super().__init__(self.z, self.alpha, self.delta, self.lum)
+        dist = np.zeros(len(members))
+        ra = np.zeros(len(members))
+        dec = np.zeros(len(members))
+        mass = np.zeros(len(members))
+        ev = np.zeros(len(members))
+        for i in range(0, len(members)):
+            dist[i] = members[i].dist
+            ra[i] = members[i].ra
+            dec[i] = members[i].dec
+            mass[i] = members[i].mass
+            ev[i] = members[i].ev
+        params = self.merge(dist, ra, dec, mass, ev)
+        super().__init__(*params)
 
     @property
     def members(self) -> tuple[Galaxy]:
@@ -29,22 +39,14 @@ class Cluster(Galaxy, ABC):
 
     @property
     def galaxies(self) -> tuple[Galaxy]:
-        return tuple(reduce(lambda acc, el: acc + (el.galaxies if isinstance(el, Cluster) else (el, )), self.members, tuple()))
+        return tuple(
+            reduce(lambda acc, el: acc + (el.galaxies if isinstance(el, Cluster) else (el,)), self.members, tuple()))
 
     @abstractmethod
-    def merge_z(self, data: Iterable[float]) -> float:
-        pass
-
-    @abstractmethod
-    def merge_alpha(self, data: Iterable[float]) -> float:
-        pass
-
-    @abstractmethod
-    def merge_delta(self, data: Iterable[float]) -> float:
-        pass
-
-    @abstractmethod
-    def merge_lum(self, data: Iterable[float]) -> float:
+    def merge(self,
+              dist: NDArray, ra: NDArray, dec: NDArray, mass: NDArray, ev: NDArray
+              ) -> Tuple[float, float, float, float, float]:
+        """Merges individual member parameters to cluster parameters"""
         pass
 
 
@@ -60,13 +62,14 @@ class Clusterer(ABC):
         """Returns class for cluster instantiation"""
         pass
 
-    def hierarchical(self, galaxies: list[Galaxy]) -> Cluster:
+    def hierarchical(self, galaxies: Iterable[Galaxy], criterion: Callable[[Cluster, Cluster], bool]) -> list[Cluster]:
         """
         Produces ierarhical tree of clusters. O(n^2) complexity
-        :param galaxies: Objects for clusterization
+        :param galaxies: Objects for clustering
+        :param criterion: Clustering border criteria, cluster is made only if it returns true
         :return: Root cluster
         """
-        clusters: list[Cluster] = galaxies # list(map(lambda g: Cluster((g, )), galaxies))
+        clusters: list[Cluster] = list(galaxies)
         # maps each cluster to its distances
         distances = dict(map(lambda c: (c, {}), clusters))
         min_dist = (inf, (None, None))
@@ -119,7 +122,7 @@ class Clusterer(ABC):
         # calculate each - to each distance
         for i in range(0, len(clusters)):
             local_min = (inf, (None, None))
-            for j in range(i+1, len(clusters)):
+            for j in range(i + 1, len(clusters)):
                 dist = self.calc_distance(clusters[i], clusters[j])
                 distances[clusters[i]][clusters[j]] = dist
                 if dist < min_dist[0]:
@@ -128,7 +131,7 @@ class Clusterer(ABC):
                     local_min = (dist, (clusters[i], clusters[j]))
             distances[clusters[i]]['min'] = local_min
         # repeat merging closest clusters
-        while len(clusters) > 1:
+        while len(clusters) > 1 and criterion(*min_dist[1]):
             min_dist = merge(*min_dist[1])
 
-        return clusters[0]
+        return clusters

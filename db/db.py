@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 
 
-class ModelError(Exception):
+class DataError(Exception):
     pass
 
 
