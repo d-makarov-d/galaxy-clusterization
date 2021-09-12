@@ -1,24 +1,31 @@
 from __future__ import annotations
 
+from astropy.coordinates import spherical_to_cartesian
+
 from .db import DBInstance, DataError
 from cosmological import CosmologicalParams
 
 
 class Galaxy(DBInstance):
-    def __init__(self, dist: float, ra: float, dec: float, mass: float, ev: float):
+    def __init__(self, dist: float, ra: float, dec: float, mass: float, ed: float):
         """
         Describes a galaxy instance. All parameters are expected in absolute values, not relative to instrument
         :param dist: Distance [Mpc]
         :param ra: Right extension (aka longitude) [rad]
         :param dec: Declination (aka latitude) [rad]
         :param mass: Stellar mass corrected
-        :param ev: Velocity calculation error [km/sec]
+        :param ed: Distance calculation error [km/sec]
         """
         self._dist = dist
         self._ra = ra
         self._dec = dec
         self._mass = mass
-        self._ev = ev
+        self._ed = ed
+
+        x, y, z = spherical_to_cartesian(self.dist, self.dec, self.ra)
+        self._x = x.value
+        self._y = y.value
+        self._z = z.value
 
     @property
     def dist(self) -> float:
@@ -37,8 +44,18 @@ class Galaxy(DBInstance):
         return self._mass
 
     @property
-    def ev(self) -> float:
-        return self._ev
+    def ed(self) -> float:
+        return self._ed
+
+    @property
+    def cart(self) -> tuple[float, float, float]:
+        """Cartesian coordinates, [X, Y, Z]"""
+        return self._x, self._y, self._z
+
+    @property
+    def split_coordinates(self) -> [float]:
+        """Returns spatial coordinates, by which BallTree and KDTree will split the space"""
+        return self.cart
 
     @staticmethod
     def from_db(data: dict, params: CosmologicalParams = None) -> Galaxy:
