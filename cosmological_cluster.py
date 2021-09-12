@@ -1,5 +1,5 @@
 from typing import Iterable, Tuple
-from astropy.coordinates import cartesian_to_spherical, spherical_to_cartesian
+from astropy.coordinates import cartesian_to_spherical
 import numpy as np
 
 from clusterization import Cluster

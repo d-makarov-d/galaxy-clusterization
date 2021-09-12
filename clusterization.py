@@ -6,9 +6,6 @@ from functools import reduce
 from collections.abc import Iterable
 from typing import Callable, Tuple
 
-import numpy as np
-from numpy.typing import NDArray
-
 from db.galaxy import Galaxy
 
 
@@ -19,18 +16,8 @@ class Cluster(Galaxy, ABC):
         :param members: Galaxies or clusters, contained by this object
         """
         self._members = members
-        dist = np.zeros(len(members))
-        ra = np.zeros(len(members))
-        dec = np.zeros(len(members))
-        mass = np.zeros(len(members))
-        ev = np.zeros(len(members))
-        for i in range(0, len(members)):
-            dist[i] = members[i].dist
-            ra[i] = members[i].ra
-            dec[i] = members[i].dec
-            mass[i] = members[i].mass
-            ev[i] = members[i].ev
-        params = self.merge(dist, ra, dec, mass, ev)
+
+        params = self.merge(members)
         super().__init__(*params)
 
     @property
@@ -43,9 +30,7 @@ class Cluster(Galaxy, ABC):
             reduce(lambda acc, el: acc + (el.galaxies if isinstance(el, Cluster) else (el,)), self.members, tuple()))
 
     @abstractmethod
-    def merge(self,
-              dist: NDArray, ra: NDArray, dec: NDArray, mass: NDArray, ev: NDArray
-              ) -> Tuple[float, float, float, float, float]:
+    def merge(self, members: tuple[Galaxy]) -> Tuple[float, float, float, float, float]:
         """Merges individual member parameters to cluster parameters"""
         pass
 
