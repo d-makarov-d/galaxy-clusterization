@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from typing import Iterable, Tuple
+from typing import Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
