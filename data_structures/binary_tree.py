@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 
 from db.galaxy import Galaxy
 from algorithms import nts_element
+import clusterization
+Clusterer = clusterization.Clusterer
 
 
 def find_node_split_dim(data, node_indices):
@@ -220,28 +222,28 @@ class NodeHeap:
 
 
 class BinaryTree(ABC):
-    """Balanced binary tree, used for KD Tree and Ball Tree implementations"""
     def __init__(self,
                  galaxies: Sequence[Galaxy],
-                 metric: Callable[[Galaxy, Galaxy], float],
+                 clusterer: Clusterer,
                  leaf_size=40,
                  sample_weight=None,
                  ):
         """
         :param galaxies: Galaxies to be put in tree
-        :param metric: Function to calculate the distance between galaxies
+        :param clusterer: Clusterer to calculate the distance between galaxies
         :param leaf_size: Number of points at which to switch to brute-force
         :param sample_weight: TODO
         """
         self.data = np.array(tuple(map(lambda el: el.split_coordinates, galaxies)), dtype=np.float_)
-        self._metric = metric
+        self._clusterer = clusterer
         self.leaf_size = leaf_size
         self._sample_weight = sample_weight
         self.galaxies = galaxies
 
-        self.node_bounds = np.empty((1, 1, 1), dtype=np.float_)
+        self.node_bounds = np.empty((1, 1, 1), dtype=np.float_)  # defined in allocate_data
 
         n_samples = self.data.shape[0]
+        n_features = self.data.shape[1]
 
         # determine number of levels in the tree, and from this
         # the number of nodes in the tree.  This results in leaf nodes
@@ -255,24 +257,25 @@ class BinaryTree(ABC):
 
         self._update_sample_weight(n_samples, sample_weight)
 
-        # Allocate tree-specific data
+        self.allocate_data(self.n_nodes, n_features)
         self._recursive_build(0, 0, n_samples)
+    """Balanced binary tree, used for KD Tree and Ball Tree implementations"""
 
     @abstractmethod
-    def allocate_data(self):
+    def allocate_data(self, n_nodes: np.int_, n_features: np.int_):
+        """Allocate tree-specific data"""
         pass
 
     @abstractmethod
-    def init_node(self: BinaryTree, i_node: np.int_, idx_start: np.int_, idx_end: np.int_):
-        """Initialize the node for the dataset stored in tree.data"""
+    def init_node(self, i_node: np.int_, idx_start: np.int_, idx_end: np.int_):
+        """Initialize the node for the dataset stored in self.data"""
         pass
 
-    @abstractmethod
     def rdist(self, p1: Galaxy, p2: Galaxy) -> np.float_:
-        pass
+        return np.float_(self._clusterer.reduced_distance(p1, p2))
 
     @abstractmethod
-    def min_rdist(self, node_i: np.int_, pt: Galaxy)  -> np.float_:
+    def min_rdist(self, i_node: np.int_, pt: Galaxy) -> np.float_:
         """Compute the minimum reduced-distance between a point and a node"""
         pass
 
@@ -282,11 +285,9 @@ class BinaryTree(ABC):
         """Compute the minimum reduced distance between two nodes"""
         pass
 
-    @staticmethod
-    @abstractmethod
-    def rdist_to_dist(distances: np.ndarray):
+    def rdist_to_dist(self, distances: np.ndarray) -> np.ndarray:
         """Convert reduced distances to real"""
-        pass
+        return self._clusterer.reduced_dist_to_dist(distances)
 
     def _update_sample_weight(self, n_samples, sample_weight):
         if sample_weight is not None:
@@ -316,7 +317,7 @@ class BinaryTree(ABC):
         else:
             # split node and recursively construct child nodes.
             self.node_data[i_node].is_leaf = False
-            i_max = find_node_split_dim(self.data, self.idx_array[idx_start:idx_end, :])
+            i_max = find_node_split_dim(self.data, self.idx_array[idx_start:idx_end])
             nts_element(self.data[:, i_max], self.idx_array, idx_start, idx_end)
             self._recursive_build(2 * i_node + 1, idx_start, idx_start + n_mid)
             self._recursive_build(2 * i_node + 2, idx_start + n_mid, idx_end)
@@ -358,7 +359,7 @@ class BinaryTree(ABC):
             raise ValueError("k must be less than or equal to the number of galaxies")
 
         # initialize heap for neighbors
-        heap = NeighborsHeap(self.data.shape[0], k)
+        heap = NeighborsHeap(len(points), k)
 
         # node heap for breadth-first queries
         node_heap = None
@@ -370,7 +371,7 @@ class BinaryTree(ABC):
         self.n_splits = 0
 
         if dualtree:
-            other = self.__class__(points, metric=self._metric, leaf_size=self.leaf_size)
+            other = self.__class__(points, clusterer=self._clusterer, leaf_size=self.leaf_size)
             if breadth_first:
                 self._query_dual_breadthfirst(other, heap, node_heap)
             else:
@@ -379,15 +380,15 @@ class BinaryTree(ABC):
                 self._query_dual_depthfirst(0, other, 0, bounds, heap, reduced_dist_LB)
         else:
             if breadth_first:
-                for i in range(0, len(points)):
-                    self._query_single_breadthfirst(self.galaxies[i], i, heap, node_heap)
+                for i in range(len(points)):
+                    self._query_single_breadthfirst(points[i], i, heap, node_heap)
             else:
-                for i in range(0, len(points)):
-                    reduced_dist_LB = self.min_rdist(0, self.galaxies[i])
-                    self._query_single_depthfirst(0, self.galaxies[i], i, heap, reduced_dist_LB)
+                for i in range(len(points)):
+                    reduced_dist_LB = self.min_rdist(0, points[i])
+                    self._query_single_depthfirst(0, points[i], i, heap, reduced_dist_LB)
 
         distances, indices = heap.get_arrays(sort=sort_results)
-        distances = self.__class__.rdist_to_dist(distances)
+        distances = self.rdist_to_dist(distances)
 
         # deflatten results
         if return_distance:
@@ -443,7 +444,6 @@ class BinaryTree(ABC):
             nodeheap_item = nodeheap.pop()
             reduced_dist_LB = nodeheap_item.val
             i_node = nodeheap_item.i1
-            node_info = self.node_data[i_node]
 
             # ------------------------------------------------------------
             # Case 1: query point is outside node radius:
@@ -456,7 +456,7 @@ class BinaryTree(ABC):
             elif self.node_data[i_node].is_leaf:
                 self.n_leaves += 1
                 for i in range(self.node_data[i_node].idx_start, self.node_data[i_node].idx_end):
-                    dist_pt = self.rdist(pt, self.data[self.idx_array[i]])
+                    dist_pt = self.rdist(pt, self.galaxies[self.idx_array[i]])
                     heap.push(i_pt, dist_pt, self.idx_array[i])
 
             # ------------------------------------------------------------
@@ -464,9 +464,9 @@ class BinaryTree(ABC):
             else:
                 self.n_splits += 1
                 for i in range(2 * i_node + 1, 2 * i_node + 3):
-                    nodeheap_item.i1 = i
-                    nodeheap_item.val = self.min_rdist(i, pt)
-                    nodeheap.push(nodeheap_item)
+                    dist = self.min_rdist(i, pt)
+                    item = NodeHeapData(dist, i, 0)
+                    nodeheap.push(item)
 
     def _query_dual_depthfirst(self, i_node1: np.int_, other: BinaryTree, i_node2: np.int_, bounds: np.ndarray,
                                heap: NeighborsHeap, reduced_dist_LB: np.float_):
@@ -600,19 +600,16 @@ class BinaryTree(ABC):
             # Case 3a: node 1 is a leaf or is smaller: split node 2 and
             #          recursively query, starting with the nearest subnode
             elif node_info1.is_leaf or (not node_info2.is_leaf and (node_info2.radius > node_info1.radius)):
-                nodeheap_item.i1 = i_node1
                 for i2 in range(2 * i_node2 + 1, 2 * i_node2 + 3):
-                    nodeheap_item.i2 = i2
-                    nodeheap_item.val = self.__class__.min_rdist_dual(self, i_node1, other, i2)
-                    nodeheap.push(nodeheap_item)
+                    dist = self.__class__.min_rdist_dual(self, i_node1, other, i2)
+                    item = NodeHeapData(dist, i1=i_node1, i2=i2)
+                    nodeheap.push(item)
 
             # ------------------------------------------------------------
             # Case 3b: node 2 is a leaf or is smaller: split node 1 and
             #          recursively query, starting with the nearest subnode
             else:
-                nodeheap_item.i2 = i_node2
                 for i1 in range(2 * i_node1 + 1, 2 * i_node1 + 3):
-                    nodeheap_item.i1 = i1
-                    nodeheap_item.val = self.__class__.min_rdist_dual(self, i1, other, i_node2)
-                    nodeheap.push(nodeheap_item)
-
+                    dist = self.__class__.min_rdist_dual(self, i1, other, i_node2)
+                    item = NodeHeapData(dist, i1=i1, i2=i_node2)
+                    nodeheap.push(item)

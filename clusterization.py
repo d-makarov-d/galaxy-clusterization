@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from math import inf
+import numpy as np
 from functools import reduce
 from collections.abc import Iterable
 from typing import Callable, Tuple
@@ -40,6 +41,13 @@ class Clusterer(ABC):
     def calc_distance(self, a: Cluster, b: Cluster) -> float:
         """Calculate distance for clustering"""
         pass
+
+    def reduced_distance(self, a: Cluster, b: Cluster) -> float:
+        """Calculate reduced distance, e/.g squared distance for euclidean metric. Standard distance for default"""
+        return self.calc_distance(a, b)
+
+    def reduced_dist_to_dist(self, distances: np.ndarray) -> np.ndarray:
+        return distances
 
     @property
     @abstractmethod
