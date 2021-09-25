@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 
 from db.galaxy import Galaxy
 from algorithms import nts_element
-import clusterization
-Clusterer = clusterization.Clusterer
 
 
 def find_node_split_dim(data, node_indices):
@@ -224,7 +222,7 @@ class NodeHeap:
 class BinaryTree(ABC):
     def __init__(self,
                  galaxies: Sequence[Galaxy],
-                 clusterer: Clusterer,
+                 clusterer,
                  leaf_size=40,
                  sample_weight=None,
                  ):

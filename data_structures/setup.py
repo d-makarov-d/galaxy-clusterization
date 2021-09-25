@@ -1,6 +1,7 @@
 from distutils.core import setup, Extension
 import numpy as np
 
+# TODO add a python wrapper with array check
 module = Extension('algorithms', sources=['algorithms.cpp'])
 
 setup(
