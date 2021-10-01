@@ -2,7 +2,7 @@
 from astropy.coordinates import cartesian_to_spherical, spherical_to_cartesian
 import numpy as np
 from astropy.cosmology import WMAP9 as cosmo
-import matplotlib.pyplot as plt
+from db.galaxy import GalaxiesDB
 
 from db.galaxy import Galaxy
 from visualization import draw_galaxies
@@ -69,7 +69,5 @@ if __name__ == '__main__':
         ed = np.random.random() * 150 / H
         gals.append(Galaxy(r.value, lon.value, lat.value, m, ed))
 
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    draw_galaxies(ax, gals)
-    plt.show()
+    db = GalaxiesDB('test_groups.db')
+    db.save(gals)

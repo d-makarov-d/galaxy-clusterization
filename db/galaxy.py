@@ -1,26 +1,31 @@
 from __future__ import annotations
 
 from astropy.coordinates import spherical_to_cartesian
+import uuid
 
-from .db import DBInstance, DataError
+from ._db_abc import DBModel, DBInstance, DBError, TableDesr
 from cosmological import CosmologicalParams
 
 
 class Galaxy(DBInstance):
-    def __init__(self, dist: float, ra: float, dec: float, mass: float, ed: float):
+    def __init__(self, dist: float, ra: float, dec: float, mass: float, ed: float, _id: str = None):
         """
         Describes a galaxy instance. All parameters are expected in absolute values, not relative to instrument
         :param dist: Distance [Mpc]
         :param ra: Right extension (aka longitude) [rad]
         :param dec: Declination (aka latitude) [rad]
         :param mass: Stellar mass corrected
-        :param ed: Distance calculation error [km/sec]
+        :param ed: Distance calculation error [Mpc]
         """
         self._dist = dist
         self._ra = ra
         self._dec = dec
         self._mass = mass
         self._ed = ed
+        if _id is None:
+            self._id = str(uuid.uuid4())
+        else:
+            self._id = _id
 
         x, y, z = spherical_to_cartesian(self.dist, self.dec, self.ra)
         self._x = x.value
@@ -58,31 +63,33 @@ class Galaxy(DBInstance):
         return self.cart
 
     @staticmethod
-    def from_db(data: dict, params: CosmologicalParams = None) -> Galaxy:
-        """Unpack dictionary, returned by database, to pythonic structure"""
-        if params is None:
-            params = CosmologicalParams()
-        # velocity relative to Local group [km/sec]
-        vlg = data.get('vlg')
-        if vlg is None:
-            raise DataError('vlg field missing')
-        # vlg error TODO: mb dist error
-        ev = data.get('ev')
-        if ev is None:
-            raise DataError('ev field missing')
-        # TODO: warning
-        # Stellar magnitude corrected
-        mag = data.get('mag') or params.gal_mag_placeholder
-        # Right extension (aka longitude)
-        ra = data.get('al') or data.get('al2000') or data.get('ra')
-        if ra is None:
-            raise DataError('[al | al2000 | ra] field missing')
-        # Declination (aka latitude)
-        dec = data.get('de') or data.get('de2000') or data.get('dec')
-        if dec is None:
-            raise DataError('[de | de2000 | dec] field missing')
-        dist = vlg / params.H0
-        return Galaxy(dist, ra, dec, mag, ev)
+    def from_db(data: tuple, params: CosmologicalParams = None) -> Galaxy:
+        return Galaxy(*data[1:], data[0])
 
-    def to_dict(self) -> dict:
-        pass
+    def to_tuple(self) -> tuple:
+        return (
+            self._id,
+            self.dist,
+            self.ra,
+            self.dec,
+            self.mass,
+            self.ed
+        )
+
+    @staticmethod
+    def table_descr() -> TableDesr:
+        fields = [
+            TableDesr.Field('dist', float),
+            TableDesr.Field('right_extension', float),
+            TableDesr.Field('declination', float),
+            TableDesr.Field('stellar_mass', float),
+            TableDesr.Field('dist_error', float),
+        ]
+        _id = TableDesr.Field('name', str)
+        return TableDesr('galaxies', fields, _id)
+
+
+class GalaxiesDB(DBModel):
+    @property
+    def schema(self) -> tuple[TableDesr]:
+        return Galaxy.table_descr(),
