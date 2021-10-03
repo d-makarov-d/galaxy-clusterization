@@ -5,7 +5,6 @@ from astropy.cosmology import WMAP9 as cosmo
 from db.galaxy import GalaxiesDB
 
 from db.galaxy import Galaxy
-from visualization import draw_galaxies
 
 H = cosmo.H(0).value
 
@@ -57,7 +56,14 @@ if __name__ == '__main__':
     for i in range(0, 3):
         lat = np.pi * (np.random.random() - 0.5)
         lon = 2 * np.pi * np.random.random()
-        gals += mk_group(Pos.from_sph(3.7, lat, lon), 31, 12.49, 0.219, 123)
+        r = 3.7 + (np.random.random() - 0.5)
+        gals += mk_group(
+            Pos.from_sph(r, lat, lon),
+            31 + np.random.randint(0, 10),
+            12.49,
+            0.5 + (np.random.random() - 0.5) * 0.8,
+            123
+        )
     # random noise
     max_r = max(list(map(lambda g: g.dist, gals))) * 2.1
     for i in range(0, 100):
@@ -69,5 +75,7 @@ if __name__ == '__main__':
         ed = np.random.random() * 150 / H
         gals.append(Galaxy(r.value, lon.value, lat.value, m, ed))
 
-    db = GalaxiesDB('test_groups.db')
+    db = GalaxiesDB('tests/test_groups.db')
+    db.drop(Galaxy)
     db.save(gals)
+    db.close()

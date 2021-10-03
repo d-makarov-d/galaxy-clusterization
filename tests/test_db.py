@@ -43,3 +43,11 @@ class DBTests(unittest.TestCase):
         _even = db.find(Galaxy, 'dist_error = 0.0')
         self.assertTrue(all(map(lambda g: g.ed == 0, _even)))
         db.close()
+
+    def test_drop_db(self):
+        db = GalaxiesDB(':memory:')
+        n = 10
+        db.save([Galaxy(1, 1, 1, 1, 1) for i in range(n)])
+        db.drop(Galaxy)
+        self.assertEqual(0, len(db.find(Galaxy)))
+        db.close()

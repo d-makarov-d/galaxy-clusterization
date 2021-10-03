@@ -8,14 +8,10 @@ import matplotlib.pyplot as plt
 import time
 import math
 import random
-import numpy
 
 from clusterization import Clusterer, Cluster
-from db.galaxy import Galaxy
+from db.galaxy import Galaxy, GalaxiesDB
 from visualization import draw_clusters
-# TODO: temporary
-from tests.mk_groups import mk_group, Pos, H
-from astropy.coordinates import cartesian_to_spherical, spherical_to_cartesian
 
 
 class EuclideanCluster(Cluster):
@@ -32,11 +28,11 @@ class EuclideanCluster(Cluster):
             mass[i] = members[i].mass
             ev[i] = members[i].ed
         return(
-            numpy.average(dist),
-            numpy.average(ra),
-            numpy.average(dec),
-            numpy.average(mass),
-            numpy.average(ev),
+            np.average(dist),
+            np.average(ra),
+            np.average(dec),
+            np.average(mass),
+            np.average(ev),
         )
 
 
@@ -106,28 +102,41 @@ class Hierarchical(unittest.TestCase):
         plt.title('Hierarchical clustering, %i points, %.3f elapsed time' % (len(data), elapsed))
         plt.show()
 
+    def test_2d_hdbscan(self):
+        data = np.load('tests/clusterable_data.npy')
+        galaxies = list(map(lambda el: Galaxy(0, el[0], el[1], 0, 0), data))
+        random.shuffle(galaxies)
+
+        elapsed = time.time()
+        labels, *_ = EuclideanClusterer().hdbscan(
+            galaxies,
+            algorithm='prims_kdtree',
+            min_cluster_size=5,
+            cluster_selection_epsilon=0.015
+        )
+        elapsed = time.time() - elapsed
+
+        coords = np.zeros((len(galaxies), 2))
+        for i, galaxy in enumerate(galaxies):
+            coords[i, :] = np.array([galaxy.ra, galaxy.dec])
+        print(max(labels))
+        for i in range(max(labels)):
+            mask = labels == i
+            plt.scatter(coords[mask, 0], coords[mask, 1], alpha=0.25, linewidth=0)
+        noise = labels == -1
+        plt.scatter(coords[noise, 0], coords[noise, 1], c='grey', alpha=0.25, linewidth=0)
+
+        plt.title('HDBSCAN clustering, %i points, %.3f elapsed time' % (len(data), elapsed))
+        plt.show()
+
     def test_3d_euclid(self):
-        gals = []
-        # generate groups
-        for i in range(0, 3):
-            lat = np.pi * (np.random.random() - 0.5)
-            lon = 2 * np.pi * np.random.random()
-            gals += mk_group(Pos.from_sph(3.7, lat, lon), 31, 12.49, 0.219, 123)
-        # random noise
-        max_r = max(list(map(lambda g: g.dist, gals))) * 2.1
-        for i in range(0, 200):
-            x = (np.random.random() - 0.5) * 2 * max_r
-            y = (np.random.random() - 0.5) * 2 * max_r
-            z = (np.random.random() - 0.5) * 2 * max_r
-            r, lat, lon = cartesian_to_spherical(x, y, z)
-            m = np.random.random() * 1.5
-            ed = np.random.random() * 150 / H
-            gals.append(Galaxy(r.value, lon.value, lat.value, m, ed))
-        # clusters
+        db = GalaxiesDB('tests/test_groups.db')
+        gals = db.find(Galaxy)
         clusterer = Euclidean3Clusterer()
-        clusters = clusterer.hierarchical(gals, lambda c1, c2: clusterer.calc_distance(c1, c2) < 0.7)
+        clusters = clusterer.hierarchical(gals, lambda c1, c2: clusterer.calc_distance(c1, c2) < 1)
 
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
         draw_clusters(ax, clusters)
         plt.show()
+        db.close()

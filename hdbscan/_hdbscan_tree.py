@@ -65,9 +65,9 @@ def _traverse_upwards(
         cluster_selection_epsilon: np.float_,
         leaf: np.int_,
         allow_single_cluster: np.int_
-):
+) -> np.int_:
     root = cluster_tree['parent'].min()
-    parent = cluster_tree[cluster_tree['child'] == leaf]['parent']
+    parent = cluster_tree[cluster_tree['child'] == leaf]['parent'][0]
     if parent == root:
         if allow_single_cluster:
             return parent
@@ -134,6 +134,7 @@ def _do_labelling(
             result[n] = -1
         elif cluster == root_cluster:
             if len(clusters) == 1 and allow_single_cluster:
+                # TODO check dictionary indexing
                 if cluster_selection_epsilon != 0.0:
                     if tree['lambda_val'][tree['child'] == n] >= 1 / cluster_selection_epsilon:
                         result[n] = cluster_label_map[cluster]

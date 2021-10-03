@@ -42,6 +42,7 @@ class DBModel(ABC):
             self.con.executemany(descr.insert_str, to_insert)
         else:
             self.con.execute(data.table_descr().insert_str, data.to_tuple())
+        self.con.commit()
 
     def find(self, item_t: DBInstance.__class__, query: str = None) -> list[DBInstance]:
         descr = item_t.table_descr()
@@ -56,10 +57,16 @@ class DBModel(ABC):
 
         return tuple(map(lambda el: item_t.from_db(el), cursor.fetchall()))
 
-
     def find_one(self, query: dict) -> DBInstance:
         # TODO
         pass
+
+    def drop(self, types: Union[DBInstance.__class__, Iterable[DBInstance.__class__]]):
+        if isinstance(types, Iterable):
+            for t in types:
+                self.con.cursor().execute('DELETE FROM %s' % t.table_descr().name)
+        else:
+            self.con.cursor().execute('DELETE FROM %s' % types.table_descr().name)
 
     def close(self):
         self.con.close()
