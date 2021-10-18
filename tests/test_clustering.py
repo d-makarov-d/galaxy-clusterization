@@ -6,7 +6,7 @@ from clusterization import Clusterer, Cluster
 from tests.test_visual import EuclideanCluster
 from db.galaxy import Galaxy
 
-X = np.load('tests/hdbscan_test_set.npy')
+X = np.load('tests/data/hdbscan_test_set.npy')
 
 
 class EuclideanClusterer(Clusterer):

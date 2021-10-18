@@ -51,6 +51,7 @@ def mk_group(pos: Pos, n_members: int, M: float, R: float, dV: float) -> list[Ga
 
 
 if __name__ == '__main__':
+    # TODO add user interface
     gals = []
     # generate groups
     for i in range(0, 3):
@@ -75,7 +76,7 @@ if __name__ == '__main__':
         ed = np.random.random() * 150 / H
         gals.append(Galaxy(r.value, lon.value, lat.value, m, ed))
 
-    db = GalaxiesDB('tests/test_groups.db')
+    db = GalaxiesDB('tests/data/test_groups.db')
     db.drop(Galaxy)
     db.save(gals)
     db.close()

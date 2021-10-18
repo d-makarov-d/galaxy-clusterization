@@ -11,7 +11,7 @@ import random
 
 from clusterization import Clusterer, Cluster
 from db.galaxy import Galaxy, GalaxiesDB
-from visualization import draw_clusters
+from visualization import draw_clusters, draw_galaxies
 
 
 class EuclideanCluster(Cluster):
@@ -62,7 +62,7 @@ class Euclidean3Clusterer(Clusterer):
 
 class Hierarchical(unittest.TestCase):
     def test_show_clusters(self):
-        data = np.load('tests/clusterable_data.npy')
+        data = np.load('tests/data/clusterable_data.npy')
         """data = [
             [0, 0],
             [1, 0],
@@ -103,7 +103,7 @@ class Hierarchical(unittest.TestCase):
         plt.show()
 
     def test_2d_hdbscan(self):
-        data = np.load('tests/clusterable_data.npy')
+        data = np.load('tests/data/clusterable_data.npy')
         galaxies = list(map(lambda el: Galaxy(0, el[0], el[1], 0, 0), data))
         random.shuffle(galaxies)
 
@@ -130,7 +130,7 @@ class Hierarchical(unittest.TestCase):
         plt.show()
 
     def test_3d_euclid(self):
-        db = GalaxiesDB('tests/test_groups.db')
+        db = GalaxiesDB('tests/data/test_groups.db')
         gals = db.find(Galaxy)
         clusterer = Euclidean3Clusterer()
         clusters = clusterer.hierarchical(gals, lambda c1, c2: clusterer.calc_distance(c1, c2) < 1)
@@ -138,5 +138,15 @@ class Hierarchical(unittest.TestCase):
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
         draw_clusters(ax, clusters)
+        plt.show()
+        db.close()
+
+    def test_leda_lv(self):
+        db = GalaxiesDB('tests/data/out.db')
+        gals = db.find(Galaxy)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        draw_galaxies(ax, gals, scalebar=True, c='green', alpha=0.6)
         plt.show()
         db.close()
