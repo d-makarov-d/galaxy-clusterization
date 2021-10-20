@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import time
 import math
 import random
+from joblib.parallel import cpu_count
 
 from clusterization import Clusterer, Cluster
 from db.galaxy import Galaxy, GalaxiesDB

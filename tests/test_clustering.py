@@ -29,3 +29,10 @@ class Hdbscan(unittest.TestCase):
         n_clusters = len(set(labels)) - int(-1 in labels)
         self.assertEqual(n_clusters, 3)
 
+    def test_hdbscan_boruvka_kdtree(self):
+        galaxies = list(map(lambda row: Galaxy(1, 0, 0, row[0], row[1]), X))
+        clusterer = EuclideanClusterer()
+        labels, p, persist, ctree, ltree, mtree = clusterer.hdbscan(galaxies, algorithm='boruvka_kdtree')
+
+        n_clusters = len(set(labels)) - int(-1 in labels)
+        self.assertEqual(n_clusters, 3)

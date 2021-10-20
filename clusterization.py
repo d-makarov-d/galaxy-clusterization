@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from typing import Callable, Tuple, Union
 
 from db.galaxy import Galaxy
-from hdbscan.hdbscan import hdbscan_prims_kdtree, _tree_to_labels
+from hdbscan.hdbscan import hdbscan_prims_kdtree, hdbscan_boruvka_kdtree, _tree_to_labels
 
 
 class Cluster(Galaxy, ABC):
@@ -48,6 +48,9 @@ class Clusterer(ABC):
         return self.calc_distance(a, b)
 
     def reduced_dist_to_dist(self, distances: np.ndarray) -> np.ndarray:
+        return distances
+
+    def dist_to_reduced(self, distances: np.ndarray) -> np.ndarray:
         return distances
 
     @property
@@ -185,7 +188,7 @@ class Clusterer(ABC):
                     * ``generic``
                     * ``prims_kdtree``
                     * ``prims_balltree``        TODO: implement
-                    * ``boruvka_kdtree``        TODO: implement
+                    * ``boruvka_kdtree``
                     * ``boruvka_balltree``      TODO: implement
 
             approx_min_span_tree : bool, optional (default=True)
@@ -303,13 +306,31 @@ class Clusterer(ABC):
             elif algorithm == 'prims_kdtree':
                 single_linkage_tree, result_min_span_tree = \
                     hdbscan_prims_kdtree(galaxies, self, min_samples, alpha, leaf_size, gen_min_span_tree)
+            elif algorithm == 'boruvka_kdtree':
+                single_linkage_tree, result_min_span_tree = hdbscan_boruvka_kdtree(
+                    galaxies,
+                    self,
+                    min_samples,
+                    alpha,
+                    leaf_size,
+                    approx_min_span_tree,
+                    gen_min_span_tree,
+                    core_dist_n_jobs
+                )
             else:
                 raise TypeError('Unknown algorithm type %s specified' % algorithm)
         else:
             # because galaxies live in 3-dimensional euclidean space, KD-tree with boruvka is considered the best method
-            # TODO: implement
-            single_linkage_tree, result_min_span_tree = \
-                hdbscan_prims_kdtree(galaxies, self, min_samples, alpha, leaf_size, gen_min_span_tree)
+            single_linkage_tree, result_min_span_tree = hdbscan_boruvka_kdtree(
+                galaxies,
+                self,
+                min_samples,
+                alpha,
+                leaf_size,
+                approx_min_span_tree,
+                gen_min_span_tree,
+                core_dist_n_jobs
+            )
 
         return _tree_to_labels(
             single_linkage_tree,

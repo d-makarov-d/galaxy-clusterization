@@ -233,7 +233,7 @@ class BinaryTree(ABC):
         :param sample_weight: TODO
         """
         self.data = np.array(tuple(map(lambda el: el.split_coordinates, galaxies)), dtype=np.float_)
-        self._clusterer = clusterer
+        self.clusterer = clusterer
         self.leaf_size = leaf_size
         self._sample_weight = sample_weight
         self.galaxies = galaxies
@@ -270,7 +270,7 @@ class BinaryTree(ABC):
         pass
 
     def rdist(self, p1: Galaxy, p2: Galaxy) -> np.float_:
-        return np.float_(self._clusterer.reduced_distance(p1, p2))
+        return np.float_(self.clusterer.reduced_distance(p1, p2))
 
     @abstractmethod
     def min_rdist(self, i_node: np.int_, pt: Galaxy) -> np.float_:
@@ -285,7 +285,7 @@ class BinaryTree(ABC):
 
     def rdist_to_dist(self, distances: np.ndarray) -> np.ndarray:
         """Convert reduced distances to real"""
-        return self._clusterer.reduced_dist_to_dist(distances)
+        return self.clusterer.reduced_dist_to_dist(distances)
 
     def _update_sample_weight(self, n_samples, sample_weight):
         if sample_weight is not None:
@@ -369,7 +369,7 @@ class BinaryTree(ABC):
         self.n_splits = 0
 
         if dualtree:
-            other = self.__class__(points, clusterer=self._clusterer, leaf_size=self.leaf_size)
+            other = self.__class__(points, clusterer=self.clusterer, leaf_size=self.leaf_size)
             if breadth_first:
                 self._query_dual_breadthfirst(other, heap, node_heap)
             else:

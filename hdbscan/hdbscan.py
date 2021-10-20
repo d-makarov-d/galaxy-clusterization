@@ -1,10 +1,12 @@
 from typing import Sequence
 import numpy as np
+from joblib.parallel import cpu_count
 
 from db.galaxy import Galaxy
 from data_structures.kd_tree import KDTree
 from ._hdbscan_linkage import mst_linkage_core_vector, label
 from ._hdbscan_tree import condense_tree, compute_stability, get_clusters
+from ._hdbscan_boruvka import KDTreeBoruvkaAlgorithm
 
 
 def _tree_to_labels(
@@ -56,3 +58,35 @@ def hdbscan_prims_kdtree(galaxies: Sequence[Galaxy], clusterer, min_samples=5,
               'the full minimum spanning tree ')
 
     return single_linkage_tree, None
+
+
+def hdbscan_boruvka_kdtree(galaxies: Sequence[Galaxy], clusterer, min_samples=5,
+                           alpha=1., leaf_size=40, approx_min_span_tree=True,
+                           gen_min_span_tree=False, core_dist_n_jobs=4):
+    if leaf_size < 3:
+        leaf_size = 3
+
+    if core_dist_n_jobs < 1:
+        core_dist_n_jobs = max(cpu_count() + 1 + core_dist_n_jobs, 1)
+
+    tree = KDTree(galaxies, clusterer, leaf_size)
+    alg = KDTreeBoruvkaAlgorithm(
+        tree,
+        min_samples,
+        leaf_size // 3,
+        alpha,
+        approx_min_span_tree,
+        core_dist_n_jobs
+    )
+
+    min_spanning_tree = alg.spanning_tree()
+    # Sort edges of the min_spanning_tree by weight
+    row_order = np.argsort(min_spanning_tree.T[2])
+    min_spanning_tree = min_spanning_tree[row_order, :]
+    # Convert edge list into standard hierarchical clustering format
+    single_linkage_tree = label(min_spanning_tree)
+
+    if gen_min_span_tree:
+        return single_linkage_tree, min_spanning_tree
+    else:
+        return single_linkage_tree, None
